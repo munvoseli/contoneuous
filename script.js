@@ -17,7 +17,7 @@ function playNote(f) {
 }
 
 let m = new Uint32Array(2);
-let nodes = []; // x, y, p, root, ?xf, ?yf
+let nodes = []; // x, y, p, root, rootdir
 let selnote = -1;
 let octpx = 600;
 
@@ -51,15 +51,17 @@ function createNode() {
 	let n = {x: m[0], y: m[1]};
 	if (nodes.length == 0) {
 		n.p = 0;
-		n.root = true;
+		n.root = -1;
 	} else {
+		if (selnote == -1) return;
 		let d = [selnote, 0];//nearestNodeData();
 		d[1] = (nodes[selnote].x - n.x) ** 2 + (nodes[selnote].y - n.y) ** 2;
 		n.xf = nodes[d[0]].x;
 		n.yf = nodes[d[0]].y;
 		let s = (n.xf > n.x) ^ (n.yf > n.y) ? -1 : 1;
 		n.p = nodes[d[0]].p + Math.sqrt(d[1]) / octpx * s * Math.log(2);
-		n.root = false;
+		n.root = d[0];
+		n.rootdir = s;
 	}
 	nodes.push(n);
 }
@@ -71,10 +73,19 @@ function draw() {
 		ctx.arc(nodes[i].x, nodes[i].y, 10, 0, 2*Math.PI);
 		ctx.fill();
 		ctx.closePath();
-		if (!nodes[i].root) {
+		let j = nodes[i].root;
+		if (j >= 0) {
+			let dx = nodes[i].x - nodes[j].x;
+			let dy = nodes[i].y - nodes[j].y;
+			let ds = Math.sqrt(dx*dx+dy*dy);
+			dx *= 10 / ds; dy *= 10 / ds;
 			ctx.beginPath();
-			ctx.moveTo(nodes[i].xf, nodes[i].yf);
-			ctx.lineTo(nodes[i].x, nodes[i].y);
+			let a, b;
+			if (nodes[i].rootdir == 1) { a = j; b = i; }
+			else { a = i; b = j; }
+			ctx.moveTo(nodes[a].x+dy, nodes[a].y-dx);
+			ctx.lineTo(nodes[b].x, nodes[b].y);
+			ctx.lineTo(nodes[a].x-dy, nodes[a].y+dx);
 			ctx.stroke();
 			ctx.closePath();
 		}
@@ -83,9 +94,10 @@ function draw() {
 		ctx.beginPath();
 		ctx.arc(nodes[selnote].x, nodes[selnote].y, octpx, 0, 2*Math.PI);
 		ctx.arc(nodes[selnote].x, nodes[selnote].y, octpx * Math.log(3/2) / Math.log(2), 0, 2*Math.PI);
+		//ctx.arc(nodes[selnote].x, nodes[selnote].y, octpx * Math.log(11/8) / Math.log(2), 0, 2*Math.PI);
+		ctx.arc(nodes[selnote].x, nodes[selnote].y, octpx * Math.log(4/3) / Math.log(2), 0, 2*Math.PI);
 		ctx.arc(nodes[selnote].x, nodes[selnote].y, octpx * Math.log(5/4) / Math.log(2), 0, 2*Math.PI);
 		ctx.arc(nodes[selnote].x, nodes[selnote].y, octpx * Math.log(6/5) / Math.log(2), 0, 2*Math.PI);
-		ctx.arc(nodes[selnote].x, nodes[selnote].y, octpx * Math.log(11/8) / Math.log(2), 0, 2*Math.PI);
 		ctx.arc(nodes[selnote].x, nodes[selnote].y, octpx * Math.log(9/8) / Math.log(2), 0, 2*Math.PI);
 		ctx.stroke();
 		ctx.closePath();
@@ -94,10 +106,17 @@ function draw() {
 
 function deleteNearestNode() {
 	if (nodes.length == 0) return;
+	if (nodes.length == 1) { nodes = []; return; }
 	let d = nearestNodeData();
+	for (let i = 0; i < nodes.length; ++i)
+		if (nodes[i].root == d[0])
+			nodes[i].root = -1;
 	if (d[0] != nodes.length - 1) {
 		nodes[d[0]] = nodes.pop();
-		if (selnote == nodes.length) selnote = d[0];
+		for (let i = 0; i < nodes.length; ++i)
+			if (nodes[i].root == nodes.length)
+				nodes[i].root = d[0];
+		selnote = -1;
 	} else {
 		nodes.pop();
 		selnote = -1;
